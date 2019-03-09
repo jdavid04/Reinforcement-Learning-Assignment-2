@@ -66,6 +66,7 @@ class QLearning:
 
 
 def get_action_probabilities(action_values, temp):
+    action_values = action_values - np.max(action_values)
     nums = np.exp(action_values / temp)
     normalizer = np.sum(nums)
-    return [num / normalizer for num in nums]
+    return nums / normalizer
