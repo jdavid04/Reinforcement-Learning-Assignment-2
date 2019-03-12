@@ -11,7 +11,7 @@ class PendulumTD:
     """
 
     def __init__(self, num_bins, x_low, x_high, y_low, y_high, discount, decay,
-                 learning_rate, num_tilings=5, seed=0):
+                 learning_rate, num_tilings=5, seed=0, offset=0.03, tile_offsets=None):
         """
         Initialize an object to perform TD-lambda policy evaluation for the given fixed policy.
 
@@ -27,12 +27,22 @@ class PendulumTD:
         """
 
         np.random.seed(seed)
+        self.offset = offset
+        if tile_offsets is None:
+            self.tile_offsets = np.array([
+                [-offset, offset, -offset, offset],
+                [0, 2 * offset, -offset, offset],
+                [-offset, offset, 0, 2 * offset],
+                [-2. * offset, 0, -offset, offset],
+                [-offset, offset, -2. * offset, 0]])
+        else:
+            self.tile_offsets = tile_offsets
         self.y_high = y_high
         self.y_low = y_low
         self.x_high = x_high
         self.x_low = x_low
-        self.x_diff = x_high - x_low
-        self.y_diff = y_high - y_low
+        self.x_diff = (x_high - x_low) * (1 + 2 * offset)
+        self.y_diff = (y_high - y_low) * (1 + 2 * offset)
         self.num_features = (num_bins ** 2) * num_tilings
         self.num_tilings = num_tilings
         self.num_bins = num_bins
@@ -88,13 +98,19 @@ class PendulumTD:
         :return: list of 5 active tile indices.
         """
 
-        # TODO currently just state aggregation --> extend to multiple tilings
+        tile_indices = []
+        for i in range(self.num_tilings):
+            offsets = self.tile_offsets[i]
+            x_high = self.x_high + offsets[1]
+            y_high = self.y_high + offsets[3]
 
-        x = x if x >= 0 else x + self.x_high
-        y = y if y >= 0 else y + self.y_high
-        x_coord = x // (self.x_diff / self.num_bins)
-        y_coord = y // (self.y_diff / self.num_bins)
-        return [int(y_coord * self.num_bins + x_coord)]
+            x = x if x >= 0 else x + x_high
+            y = y if y >= 0 else y + y_high
+            x_coord = x // (self.x_diff / self.num_bins)
+            y_coord = y // (self.y_diff / self.num_bins)
+            idx_multiplier = i * self.num_bins ** 2
+            tile_indices.append(int(y_coord * self.num_bins + x_coord) + idx_multiplier)
+        return tile_indices
 
     def _get_observation_state(self, observation):
         """
@@ -122,6 +138,7 @@ class PendulumTD:
 def run(num_episodes, pendulum_algo, env):
     for _ in tqdm(range(num_episodes)):
         run_episode(env, pendulum_algo)
+    return pendulum_algo.function_approximation(state=pendulum_algo.get_features((0, 0)))
 
 
 def run_episode(env, pendulum_algo):
@@ -144,10 +161,10 @@ def _initialize_episode(env, start_state=[0, 0]):
 
 if __name__ == '__main__':
     env = gym.make("Pendulum-v0")
-    lambd = 0
+    lambd = 1
     learning_rate = 0.25
     pendulum_algo = PendulumTD(num_bins=10, x_low=-np.pi, x_high=np.pi, y_low=-8., y_high=8.,
                                discount=0.9, decay=lambd,
                                learning_rate=learning_rate,
-                               num_tilings=1, seed=0)
+                               num_tilings=5, seed=0)
     run_episode(env, pendulum_algo)
