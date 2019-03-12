@@ -136,9 +136,10 @@ class PendulumTD:
 
 
 def run(num_episodes, pendulum_algo, env):
-    for _ in tqdm(range(num_episodes)):
-        run_episode(env, pendulum_algo)
-    return pendulum_algo.function_approximation(state=pendulum_algo.get_features((0, 0)))
+    values = np.zeros(num_episodes)
+    for i in range(num_episodes):
+        values[i] = run_episode(env, pendulum_algo)
+    return values
 
 
 def run_episode(env, pendulum_algo):
